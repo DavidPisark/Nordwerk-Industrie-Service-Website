@@ -28,13 +28,9 @@ html {
 body {
   margin: 0;
   overflow-x: hidden;
-}
-
-.container {
-  width: 100%;
-  max-width: var(--max-width);
-  margin: 0 auto;
-  padding: 0 1.25rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
 
 a:focus-visible,
@@ -44,188 +40,190 @@ button:focus-visible {
   border-radius: 4px;
 }
 
+/* Header & Navigation (matches Backend Agent markup) */
+header,
 .site-header {
   background-color: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 2px solid var(--color-border);
   position: sticky;
   top: 0;
   z-index: 10;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
 }
 
+.header-container,
+.header-inner,
+.container {
+  width: 100%;
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 1rem 1.5rem;
+}
+
+.header-container,
 .header-inner {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding-top: 1rem;
-  padding-bottom: 1rem;
 }
 
 .brand {
   font-weight: 700;
-  font-size: 1.15rem;
+  font-size: 1.25rem;
   color: var(--color-primary);
   text-decoration: none;
+  letter-spacing: -0.01em;
 }
 
+nav ul,
 .nav-list {
   list-style: none;
   display: flex;
   flex-wrap: wrap;
-  gap: 1.25rem;
+  gap: 1.5rem;
   margin: 0;
   padding: 0;
 }
 
+nav a,
 .nav-list a {
   color: var(--color-text);
   text-decoration: none;
-  font-weight: 500;
+  font-weight: 600;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
+nav a:hover,
 .nav-list a:hover {
   color: var(--color-primary);
-  text-decoration: underline;
+  background-color: var(--color-surface-alt);
+}
+
+/* Main Content & Sections */
+main {
+  flex: 1;
+  width: 100%;
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2.25rem;
 }
 
 .hero {
-  background-color: var(--color-surface);
-  padding: 3.5rem 0;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.eyebrow {
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--color-primary);
-  margin: 0 0 0.5rem 0;
+  background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+  border: 1px solid var(--color-border);
+  border-left: 6px solid var(--color-primary);
+  border-radius: 10px;
+  padding: 3rem 2.25rem;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
 }
 
 .hero h1 {
-  font-size: clamp(1.85rem, 4vw, 2.6rem);
+  font-size: clamp(1.9rem, 4vw, 2.65rem);
   line-height: 1.2;
+  color: var(--color-primary);
   margin: 0 0 0.75rem 0;
 }
 
 .hero-claim {
   font-size: 1.25rem;
   font-weight: 600;
-  color: var(--color-text);
-  margin: 0 0 0.75rem 0;
-}
-
-.hero-intro {
   color: var(--color-text-muted);
-  max-width: 65ch;
   margin: 0 0 1.75rem 0;
 }
 
-.hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.85rem;
-  align-items: center;
+.services,
+.contact,
+.service-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 2.25rem;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+  scroll-margin-top: 5rem;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
-.btn-primary,
-.btn-secondary {
-  display: inline-block;
-  padding: 0.7rem 1.3rem;
-  border-radius: 6px;
-  font-weight: 600;
-  text-decoration: none;
-  transition: background-color 0.15s ease, color 0.15s ease;
+.services:target,
+.contact:target {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(15, 76, 129, 0.18);
 }
 
+.services h2,
+.contact h2 {
+  font-size: 1.5rem;
+  color: var(--color-primary);
+  margin: 0 0 0.85rem 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--color-surface-alt);
+}
+
+.services p,
+.contact p {
+  font-size: 1.05rem;
+  color: var(--color-text-muted);
+  margin: 0 0 1.25rem 0;
+}
+
+.services p:last-child {
+  margin-bottom: 0;
+}
+
+/* Primary Call-to-Action Button */
+.cta-button,
 .btn-primary {
+  display: inline-block;
   background-color: var(--color-primary);
   color: #ffffff;
+  font-weight: 600;
+  font-size: 1rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  text-decoration: none;
+  box-shadow: 0 2px 4px rgba(15, 76, 129, 0.2);
+  transition: background-color 0.15s ease, transform 0.1s ease;
 }
 
+.cta-button:hover,
 .btn-primary:hover {
   background-color: var(--color-primary-hover);
 }
 
-.btn-secondary {
-  background-color: transparent;
-  color: var(--color-primary);
-  border: 1px solid var(--color-primary);
-}
-
-.btn-secondary:hover {
-  background-color: var(--color-surface-alt);
-}
-
-.section {
-  padding: 3rem 0;
-}
-
-.section-alt {
-  background-color: var(--color-surface-alt);
-  border-top: 1px solid var(--color-border);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.section h2 {
-  font-size: 1.5rem;
-  margin: 0 0 1.25rem 0;
-}
-
-.service-card {
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-left: 4px solid var(--color-primary);
-  border-radius: 8px;
-  padding: 1.5rem;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
-}
-
-.service-card h3 {
-  margin: 0 0 0.5rem 0;
-  font-size: 1.25rem;
-  color: var(--color-primary);
-}
-
-.service-card p {
-  margin: 0;
-  color: var(--color-text-muted);
-}
-
-.contact-cta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
-  margin-top: 1rem;
-}
-
-.contact-mail {
-  color: var(--color-text-muted);
-  font-size: 0.95rem;
-}
-
+/* Footer */
+footer,
 .site-footer {
   background-color: #0f172a;
   color: #f8fafc;
-  padding: 2rem 0;
+  padding: 1.75rem 1.5rem;
+  text-align: center;
+  margin-top: auto;
 }
 
+footer p,
 .legal-notice {
-  margin: 0;
+  max-width: var(--max-width);
+  margin: 0 auto;
   font-size: 0.95rem;
-  font-weight: 500;
+  color: #e2e8f0;
 }
 
-@media (max-width: 480px) {
-  .hero {
-    padding: 2.25rem 0;
+@media (max-width: 600px) {
+  .hero,
+  .services,
+  .contact {
+    padding: 1.5rem;
   }
 
-  .btn-primary,
-  .btn-secondary {
+  .cta-button,
+  .btn-primary {
+    display: block;
     width: 100%;
     text-align: center;
   }
