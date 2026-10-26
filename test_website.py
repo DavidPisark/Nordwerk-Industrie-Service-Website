@@ -1,7 +1,8 @@
 """
 Automated Product Verification for Nordwerk Industrie-Service (Release Candidate 1 / Session 3).
 Checks exact customer briefing text blocks (N-01, N-02, N-03, N-08, N-09), semantic HTML5 structure,
-accessibility attributes, and strict absence of external trackers or invented claims.
+accessibility attributes, strict absence of external trackers or invented claims, and zero PHP/legacy
+server-side execution surface (mitigating CVE-2026-109618 & CVE-2026-109619 / ENISA advisory 2026-10-21).
 """
 
 from pathlib import Path
@@ -31,7 +32,26 @@ FORBIDDEN_PATTERNS = [
     "ISO 9001",
     "TÜV",
     "24/7 Notdienst",
+    "<?php",
+    "<?=",
+    ".php",
 ]
+
+FORBIDDEN_PHP_EXTENSIONS = {".php", ".phtml", ".phar", ".php5", ".php7", ".inc", ".cgi"}
+
+
+def verify_no_php_attack_surface(root: Path) -> list[str]:
+    """Ensure zero PHP files or server-side PHP tags exist in the static product checkout (CVE-2026-109618 / CVE-2026-109619)."""
+    errors: list[str] = []
+    for path in root.rglob("*"):
+        if ".git" in path.parts or "__pycache__" in path.parts:
+            continue
+        if path.is_file() and path.suffix.lower() in FORBIDDEN_PHP_EXTENSIONS:
+            errors.append(
+                f"Forbidden PHP/legacy runtime file detected ({path.relative_to(root)}): "
+                "violates static architecture and exposes CVE-2026-109618 / CVE-2026-109619 RCE surface."
+            )
+    return errors
 
 
 def verify_website(base_dir: Path | None = None) -> list[str]:
@@ -61,7 +81,9 @@ def verify_website(base_dir: Path | None = None) -> list[str]:
 
     for forbidden in FORBIDDEN_PATTERNS:
         if forbidden.lower() in html.lower():
-            errors.append(f"Forbidden external dependency or unverified claim found: {forbidden!r}")
+            errors.append(f"Forbidden external dependency, PHP tag, or unverified claim found: {forbidden!r}")
+
+    errors.extend(verify_no_php_attack_surface(root))
 
     if css_path.is_file():
         css = css_path.read_text(encoding="utf-8")
@@ -83,5 +105,8 @@ if __name__ == "__main__":
         for err in found_errors:
             print(f" - {err}", file=sys.stderr)
         sys.exit(1)
-    print("PASSED: All Nordwerk RC1 checks (N-01, N-02, N-03, N-08, N-09, HTML5, CSS focus, zero external dependencies).")
+    print(
+        "PASSED: All Nordwerk RC1 checks (N-01, N-02, N-03, N-08, N-09, HTML5, CSS focus, "
+        "zero external dependencies, zero PHP CVE-2026-109618/109619 surface)."
+    )
     sys.exit(0)
