@@ -228,3 +228,33 @@ footer p,
     text-align: center;
   }
 }
+
+
+/* Termin 4: Service cards inside .services and target audience lists */
+.services .service-card {
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-primary);
+  border-radius: 8px;
+  padding: 1.25rem 1.5rem;
+  margin-top: 1rem;
+  box-shadow: none;
+}
+
+.services .service-card h3 {
+  font-size: 1.2rem;
+  color: var(--color-primary);
+  margin: 0 0 0.5rem 0;
+}
+
+.services ul {
+  margin: 0.5rem 0 0 1.25rem;
+  padding: 0;
+  color: var(--color-text-muted);
+  font-size: 1.05rem;
+}
+
+.services li {
+  margin-bottom: 0.4rem;
+  font-weight: 500;
+}
