@@ -1,242 +1,129 @@
 """
-Automatisierte Prüfung für CR-01: Englische Landing-Page + Zielgruppen-Erweiterung.
+Automatisierte Prüfung für die Kundenänderung CR-01 (Termin 5).
 
-AC-01..08 Regressionsschutz (deutsche View): via test_website.py verify_website()
-AC-09: Englische View (index_en.html):
-  - EN-01: lang="en" gesetzt
-  - EN-02: Titel "Nordwerk Industrie-Service" vorhanden
-  - EN-03: Englischer Hero-Text vorhanden ("Practical support")
-  - EN-04: "Project Coordination" Karte vorhanden (R-01 Erweiterung auf Englisch)
-  - EN-05: "Technical procurement departments" als Zielgruppe vorhanden
-  - EN-06: mailto:kontakt@nordwerk.example mit Label "Send request"
-  - EN-07: Link zur deutschen Version (href="index.html") vorhanden
-  - EN-08: Viewport-Meta vorhanden
-  - EN-09: styles.css eingebunden
-  - DE-10: "Technische Einkaufsabteilungen" in deutscher index.html vorhanden
-  - DE-11: Link zur englischen Version (href="index_en.html") in deutscher Nav vorhanden
+Prüft:
+  1. Regression: alle Prüffamilien F1–F4 aus test_website.py für index.html (AC-01..AC-08).
+  2. CR-01 EN: englische Ansicht index_en.html mit den verbindlichen Inhalten aus dem
+     Aufgabenblatt Termin 5 (Titel, Hauptaussage, drei Leistungen, Zielgruppe, Kontakt, Hinweis),
+     Sprachkennzeichnung lang="en", Dokumenttitel, Viewport, Sprachwechsel und lokale Verweise.
+  3. CR-01 DE: deutsche Ansicht index.html mit zusätzlicher Zielgruppe
+     „Technische Einkaufsabteilungen“ und Sprachwechsel zur englischen Ansicht.
+
+Aufruf:  python test_cr01.py          (alle Familien)
+         python test_cr01.py --en     (nur Regression + EN, für den ersten Teillauf)
 """
 
 from __future__ import annotations
 
-import re
 import sys
-from html.parser import HTMLParser
 from pathlib import Path
 
-from test_website import verify_website
+from test_website import _PageParser, _is_external, _load, _norm, verify_website
 
-ROOT = Path(__file__).resolve().parent
-
-
-class _PageParser(HTMLParser):
-    """Collect visible text, links, ids, headings, images and asset references."""
-
-    def __init__(self) -> None:
-        super().__init__(convert_charrefs=True)
-        self.text_parts: list[str] = []
-        self.ids: set[str] = set()
-        self.anchors: list[dict] = []  # {"href", "text", "in_nav"}
-        self.assets: list[tuple[str, str]] = []  # (tag, url)
-        self.headings: list[int] = []
-        self.images_without_alt: list[str] = []
-        self.title = ""
-        self.html_lang = ""
-        self.has_viewport = False
-        self._in_title = False
-        self._nav_depth = 0
-        self._skip_depth = 0
-        self._open_anchor: dict | None = None
-
-    def handle_starttag(self, tag, attrs):
-        a = {k: (v or "") for k, v in attrs}
-        if a.get("id"):
-            self.ids.add(a["id"])
-        if tag == "html":
-            self.html_lang = a.get("lang", "")
-        elif tag == "title":
-            self._in_title = True
-        elif tag in ("script", "style"):
-            self._skip_depth += 1
-        elif tag == "nav":
-            self._nav_depth += 1
-        elif tag == "meta" and a.get("name", "").lower() == "viewport":
-            self.has_viewport = True
-        elif re.fullmatch(r"h[1-6]", tag):
-            self.headings.append(int(tag[1]))
-        elif tag == "img":
-            if "alt" not in a:
-                self.images_without_alt.append(a.get("src", "?"))
-        if tag == "a" and "href" in a:
-            self._open_anchor = {"href": a["href"].strip(), "text": "", "in_nav": self._nav_depth > 0}
-            self.anchors.append(self._open_anchor)
-        for attr in ("href", "src"):
-            if attr in a and tag != "a":
-                self.assets.append((tag, a[attr].strip()))
-
-    def handle_endtag(self, tag):
-        if tag == "title":
-            self._in_title = False
-        elif tag in ("script", "style") and self._skip_depth:
-            self._skip_depth -= 1
-        elif tag == "nav" and self._nav_depth:
-            self._nav_depth -= 1
-        elif tag == "a":
-            self._open_anchor = None
-
-    def handle_data(self, data):
-        if self._in_title:
-            self.title += data
-        if self._skip_depth:
-            return
-        self.text_parts.append(data)
-        if self._open_anchor is not None:
-            self._open_anchor["text"] += data
-
-    @property
-    def visible_text(self) -> str:
-        return re.sub(r"\s+", " ", " ".join(self.text_parts)).strip()
+EN_FILE = "index_en.html"
+EN_TITLE = "Nordwerk Industrie-Service"
+EN_REQUIRED_TEXT = [
+    "Nordwerk Industrie-Service",
+    "Practical support for your technical operations.",
+    "Maintenance planning",
+    "Spare parts coordination",
+    "Operational documentation",
+    "Technical purchasing departments",
+    "Request information",
+    "Fictional company – HAW Hamburg course project. No real offers or contact.",
+]
+CONTACT_HREF = "mailto:kontakt@nordwerk.example"
+DE_AUDIENCE = "Technische Einkaufsabteilungen"
 
 
-def _norm(value: str) -> str:
-    return re.sub(r"\s+", " ", value).strip()
-
-
-def _load_en() -> tuple[str, _PageParser]:
-    html = (ROOT / "index_en.html").read_text(encoding="utf-8")
+def _load_en(root: Path) -> _PageParser | None:
+    path = root / EN_FILE
+    if not path.is_file():
+        return None
     parser = _PageParser()
-    parser.feed(html)
-    return html, parser
+    parser.feed(path.read_text(encoding="utf-8"))
+    return parser
 
 
-# ---------------------------------------------------------------- AC-01..08 Regression
-def test_ac01_to_ac08_regression():
-    """Regressionsschutz: deutsche View muss weiterhin alle Prüffamilien bestehen."""
-    results = verify_website(ROOT)
-    all_errors: list[str] = []
-    for family, errors in results.items():
-        all_errors.extend(errors)
-    assert not all_errors, "Regression in test_website.py:\n- " + "\n- ".join(all_errors)
+def check_en(root: Path) -> list[str]:
+    errors: list[str] = []
+    page = _load_en(root)
+    if page is None:
+        return [f"[CR-01 EN] {EN_FILE} fehlt"]
+    visible = page.visible_text
+    for text in EN_REQUIRED_TEXT:
+        if _norm(text) not in visible:
+            errors.append(f"[CR-01 EN] Pflichttext fehlt: {text!r}")
+    if _norm(page.title) != EN_TITLE:
+        errors.append(f"[CR-01 EN] <title> ist {page.title!r}, erwartet {EN_TITLE!r}")
+    if not page.html_lang.lower().startswith("en"):
+        errors.append(f"[CR-01 EN] <html lang> ist {page.html_lang!r}, erwartet 'en'")
+    if not page.has_viewport:
+        errors.append("[CR-01 EN] Viewport-Meta fehlt")
+    contact = [a for a in page.anchors if a["href"] == CONTACT_HREF]
+    if not contact:
+        errors.append(f"[CR-01 EN] Kontaktlink {CONTACT_HREF} fehlt")
+    elif not any("Request information" in _norm(a["text"]) for a in contact):
+        errors.append("[CR-01 EN] Kontaktlink trägt nicht den Text 'Request information'")
+    if not any(a["href"] in ("index.html", "./index.html") for a in page.anchors):
+        errors.append("[CR-01 EN] Sprachwechsel-Link zur deutschen Ansicht (index.html) fehlt")
+    for a in page.anchors:
+        href = a["href"]
+        if href == "#" or (href.startswith("#") and href[1:] not in page.ids):
+            errors.append(f"[CR-01 EN] Interner Link {href!r} hat kein Ziel (id fehlt)")
+        if _is_external(href):
+            errors.append(f"[CR-01 EN] Externe Abhängigkeit nicht erlaubt: {href!r}")
+    for tag, url in page.assets:
+        if not url or _is_external(url) or url.startswith(("#", "data:")):
+            continue
+        if not (root / url.split("#")[0].split("?")[0]).exists():
+            errors.append(f"[CR-01 EN] lokaler Verweis zeigt ins Leere: <{tag}> {url}")
+    return errors
 
 
-# ---------------------------------------------------------------- AC-09 Englische View
-def test_en01_lang_attribute():
-    """EN-01: lang="en" gesetzt."""
-    _, page = _load_en()
-    assert page.html_lang.lower() == "en", f'EN-01: html lang erwartet "en", gefunden: {page.html_lang!r}'
+def check_de(root: Path) -> list[str]:
+    errors: list[str] = []
+    if not (root / "index.html").is_file():
+        return ["[CR-01 DE] index.html fehlt"]
+    _, page = _load(root)
+    if _norm(DE_AUDIENCE) not in page.visible_text:
+        errors.append(f"[CR-01 DE] Zielgruppe fehlt: {DE_AUDIENCE!r}")
+    if not any(a["href"] in (EN_FILE, "./" + EN_FILE) for a in page.anchors):
+        errors.append(f"[CR-01 DE] Sprachwechsel-Link zur englischen Ansicht ({EN_FILE}) fehlt")
+    return errors
 
 
-def test_en02_title():
-    """EN-02: Titel "Nordwerk Industrie-Service" vorhanden."""
-    _, page = _load_en()
-    assert "Nordwerk Industrie-Service" in page.title, (
-        f'EN-02: Titel fehlt "Nordwerk Industrie-Service" (gefunden: {page.title!r})'
-    )
+def verify_cr01(base_dir: Path | None = None, include_de: bool = True) -> dict[str, list[str]]:
+    root = (base_dir or Path(__file__).resolve().parent).resolve()
+    results = verify_website(root)
+    results["CR-01 EN Englische Ansicht"] = check_en(root)
+    if include_de:
+        results["CR-01 DE Zielgruppe & Sprachwechsel"] = check_de(root)
+    return results
 
 
-def test_en03_hero_text():
-    """EN-03: Englischer Hero-Text vorhanden ("Practical support")."""
-    _, page = _load_en()
-    assert "Practical support" in page.visible_text, (
-        'EN-03: Hero-Text "Practical support" nicht gefunden'
-    )
+def test_cr01_en_and_no_regressions():
+    results = verify_cr01(include_de=False)
+    errors = [e for errs in results.values() for e in errs]
+    assert not errors, "CR-01 EN fehlgeschlagen:\n- " + "\n- ".join(errors)
 
 
-def test_en04_project_coordination():
-    """EN-04: "Project Coordination" Karte vorhanden (R-01 Erweiterung auf Englisch)."""
-    _, page = _load_en()
-    assert "Project Coordination" in page.visible_text, (
-        'EN-04: Service-Karte "Project Coordination" nicht gefunden'
-    )
-
-
-def test_en05_technical_procurement():
-    """EN-05: "Technical procurement departments" als Zielgruppe vorhanden."""
-    _, page = _load_en()
-    assert "Technical procurement departments" in page.visible_text, (
-        'EN-05: Zielgruppe "Technical procurement departments" nicht gefunden'
-    )
-
-
-def test_en06_mailto_send_request():
-    """EN-06: mailto:kontakt@nordwerk.example mit Label "Send request"."""
-    _, page = _load_en()
-    mailto = "mailto:kontakt@nordwerk.example"
-    matching = [a for a in page.anchors if a["href"] == mailto and "Send request" in _norm(a["text"])]
-    assert matching, (
-        f'EN-06: Kein Link "Send request" mit Ziel {mailto} gefunden'
-    )
-
-
-def test_en07_link_to_german():
-    """EN-07: Link zur deutschen Version (href="index.html") vorhanden."""
-    _, page = _load_en()
-    hrefs = [a["href"] for a in page.anchors]
-    assert "index.html" in hrefs, 'EN-07: Link href="index.html" zur deutschen Version fehlt'
-
-
-def test_en08_viewport_meta():
-    """EN-08: Viewport-Meta vorhanden."""
-    _, page = _load_en()
-    assert page.has_viewport, 'EN-08: <meta name="viewport"> fehlt in index_en.html'
-
-
-def test_en09_styles_css():
-    """EN-09: styles.css eingebunden."""
-    _, page = _load_en()
-    css_links = [url for tag, url in page.assets if tag == "link" and "styles.css" in url]
-    assert css_links, 'EN-09: styles.css nicht als Stylesheet eingebunden'
-
-
-def test_de10_technische_einkaufsabteilungen():
-    """DE-10: "Technische Einkaufsabteilungen" in deutscher index.html vorhanden."""
-    html = (ROOT / "index.html").read_text(encoding="utf-8")
-    parser = _PageParser()
-    parser.feed(html)
-    assert "Technische Einkaufsabteilungen" in parser.visible_text, (
-        'DE-10: "Technische Einkaufsabteilungen" in index.html nicht gefunden'
-    )
-
-
-def test_de11_link_to_english():
-    """DE-11: Link zur englischen Version (href="index_en.html") in deutscher Nav vorhanden."""
-    html = (ROOT / "index.html").read_text(encoding="utf-8")
-    parser = _PageParser()
-    parser.feed(html)
-    nav_hrefs = [a["href"] for a in parser.anchors if a["in_nav"]]
-    assert "index_en.html" in nav_hrefs, (
-        'DE-11: Link href="index_en.html" in <nav> der deutschen index.html fehlt'
-    )
+def test_cr01_de():
+    errors = check_de(Path(__file__).resolve().parent)
+    assert not errors, "CR-01 DE fehlgeschlagen:\n- " + "\n- ".join(errors)
 
 
 if __name__ == "__main__":
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
         sys.stderr.reconfigure(encoding="utf-8")
-
-    tests = [
-        ("AC-01..08 Regression",               test_ac01_to_ac08_regression),
-        ("EN-01 lang=en",                       test_en01_lang_attribute),
-        ("EN-02 Title",                         test_en02_title),
-        ("EN-03 Hero text",                     test_en03_hero_text),
-        ("EN-04 Project Coordination",          test_en04_project_coordination),
-        ("EN-05 Technical procurement dept.",   test_en05_technical_procurement),
-        ("EN-06 mailto + Send request",         test_en06_mailto_send_request),
-        ("EN-07 Link to German version",        test_en07_link_to_german),
-        ("EN-08 Viewport meta",                 test_en08_viewport_meta),
-        ("EN-09 styles.css linked",             test_en09_styles_css),
-        ("DE-10 Technische Einkaufsabt.",       test_de10_technische_einkaufsabteilungen),
-        ("DE-11 Link to English version",       test_de11_link_to_english),
-    ]
-
+    res = verify_cr01(include_de="--en" not in sys.argv)
     failed = False
-    for label, fn in tests:
-        try:
-            fn()
-            print(f"PASSED       {label}")
-        except AssertionError as exc:
-            print(f"FAILED       {label}")
-            print(f"             {exc}")
-            failed = True
-
-    print("ERGEBNIS: " + ("FEHLGESCHLAGEN" if failed else "ALLE CR-01-PRÜFUNGEN BESTANDEN"))
+    for family, errs in res.items():
+        status = "PASSED" if not errs else f"FAILED ({len(errs)})"
+        print(f"{status:<12} {family}")
+        for err in errs:
+            print(f"             - {err}")
+        failed = failed or bool(errs)
+    print("ERGEBNIS CR-01: " + ("FEHLGESCHLAGEN" if failed else "BESTANDEN (0 Regressionen)"))
     sys.exit(1 if failed else 0)
